@@ -1,0 +1,149 @@
+---
+title: "static_testing"
+author: "Gillian McGinnis"
+date: "5/7/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries}
+library(tidyverse)
+library(genius)
+library(magrittr)
+library(sentimentr)
+library(tidytext)
+library(ggthemes)
+library(viridis)
+```
+
+```{r inputs}
+artist_of_interest <- "alt-J"
+albums_of_interest <- c("An Awesome Wave", "This Is All Yours", "RELAXER")
+dropwords <- NULL
+```
+
+```{r get_lyrics}
+get_lyrics <- function(artist_input, albums_input){
+  list_of_albums <- as.data.frame(albums_input) %>%
+    rowid_to_column() %>%
+    mutate(album = as.character(rowid))
+  
+  albums_input %>%
+    map_dfr(.f = genius_album, artist = {{artist_input}}, .id = "album") %>%
+    left_join(list_of_albums) %>%
+    select(!album) %>%
+    rename(album = albums_input) %>%
+    mutate(album = fct_relevel(as.factor(album), {{albums_input}}))
+}
+```
+
+```{r getting_lyrics}
+my_lyrics <- get_lyrics(artist_of_interest, albums_of_interest)
+
+glimpse(my_lyrics)
+```
+
+
+```{r sentiment_sentences}
+# my_lyrics %>% 
+#   mutate(lyric_split = get_sentences(lyric)) %$% 
+#   sentiment_by(lyric_split, list(track_title, album))
+
+sentences <- my_lyrics %>% 
+  get_sentences() %$%
+  sentiment_by(lyric, list(track_title, album))
+
+sentences %>% 
+  ggplot(aes(x = ave_sentiment, y = track_title, color = album)) +
+  geom_point()
+```
+
+```{r text_highlighting}
+my_lyrics %>% 
+  #filter(track_title == "Breezeblocks") %>% 
+  mutate(lyric_line = get_sentences(lyric)) %$%
+  sentiment_by(lyric, list(track_title, album)) %>% 
+  #sentiment_by(track_title, album) %>% 
+  highlight()
+```
+
+```{r afinn}
+album_afinn <- function(lyrics_df,
+                        color_pal = "plasma",
+                        scale_option = "free_y"){
+  lyrics_df %>%
+    unnest_tokens(output = word, input = lyric, token = "words") %>% 
+    group_by(album, track_title) %>%
+    mutate(index = round(line / max(line) * 100)) %>%
+    inner_join(get_sentiments("afinn")) %>%
+    ungroup() %>%
+    count(album, index = index, wt = value) %>%
+    ggplot(aes(x = index, y = n, fill = n)) +
+    facet_grid(rows = vars(album), scales = {{scale_option}}) +
+    geom_col() +
+    theme_few() +
+    labs(
+      x = "Relative line position (% through song)",
+      y = "Sentiment value",
+      fill = "Sentiment value: ",
+      title = paste("Sentiment analysis of select", {{artist_of_interest}}, "albums"),
+      subtitle = "Net sentiment value by relative line position across all songs in an album.",
+      caption = "Sentiment data provided by Finn Arup Nielsen"
+      ) +
+    geom_hline(yintercept = 0, color = "black") +
+    theme(legend.position = "bottom") +
+    scale_fill_viridis(option = {{color_pal}})
+}
+
+album_afinn(my_lyrics)
+```
+
+```{r nrc_album}
+nrc_order <- c("positive", "negative",
+               "anger", "fear", "anticipation",
+               "trust", "surprise",
+               "sadness", "joy", "disgust")
+
+album_nrc <- function(lyrics_df){
+  lyrics_df %>% 
+    unnest_tokens(output = word, input = lyric, token = "words") %>% 
+    inner_join(get_sentiments("nrc")) %>%
+    count(album, sentiment) %>% 
+    mutate(sentiment = fct_relevel(as.factor(sentiment), nrc_order)) %>% 
+  mutate(cat = case_when(
+    (sentiment == "positive" | sentiment == "negative") ~ "Sentiment",
+    TRUE ~ "Emotion")
+  ) %>% 
+    ggplot(aes(x = n,
+               y = sentiment,
+               fill = album)) +
+    facet_grid(vars(cat), scales = "free_y") +
+    geom_col(position = "dodge") +
+    theme_few() +
+    theme(legend.position = "bottom") +
+    labs(
+      title = paste("Sentiment analysis of select", {{artist_of_interest}}, "albums"),
+      x = "Word count",
+      y = "",
+      color = "Album"
+    )
+}
+
+album_nrc(my_lyrics)
+```
+
+```{r text_input_test}
+listy <- c("'Demon, Days', 'Plasitc beach', 'The fall")
+data.frame(
+  album = c(unlist(str_split(listy, "'")))
+)
+
+listy_new <- c("Demon Days", "Plastic beach", "the fall")
+data.frame(
+  album = c(unlist(str_split(listy_new, ", ")))
+)
+```
+
