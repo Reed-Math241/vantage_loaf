@@ -8,6 +8,7 @@ library(sentimentr)
 library(magrittr)
 library(ggthemes)
 library(viridis)
+library(DT)
 
 ui <- dashboardPage(
   skin = "yellow",
@@ -30,14 +31,29 @@ ui <- dashboardPage(
           column(width = 4,
           box(width = NULL,
             h3("Welcome!"),
-            h4("This dashboard will grab information from Genius based on your inputs to the right, and conduct sentiment analysis."),
-            "You can grab information for multiple albums from a single artist, or multiple albums from different artists."
+            h4("This dashboard will grab information from",
+            tags$a(href="https://genius.com/", "Genius"),
+            "based on provided inputs, and conduct sentiment analysis."),
+            "You can grab information for multiple albums from a single artist, or multiple albums from different artists.",
+            HTML("You can also filter out \"dropwords\" (words that might overwhelm word-by-word analysis that otherwise aren't stopwords).<br>"),
+            "Due to the nature of the function used to grab the lyric data, some songs might not have their lyric data properly loaded,
+            since Genius is not always consistent with URLs."
           ),
           box(width = NULL,
             title = "Author",
             "This dashboard was created by",
             tags$a(href="https://github.com/gmcginnis", "Gillian McGinnis"),
-            "in May 2021."
+            "in May 2021 as a final project in Reed College Math 241 - Data Science."),
+          box(width = NULL, solidHeader = TRUE, background = "black", status = "warning",
+              title = "Dropwords",
+              textInput("input_dropwords", label = "Input dropwords, separated by commas:"),
+              actionButton(inputId = "action_dropwords",
+                           label = "Submit dropwords!",
+                           icon = icon("hand-point-right"),
+                           class = "btn-warning"),
+              h3("Top tokens"),
+              "These are the highest count non-stopwords in the data. Should some be included in the list of dropwords?",
+              tableOutput("top_tokens")
           )),
           column(width = 4,
           box(width = NULL, solidHeader = TRUE, background = "black", status = "warning",
@@ -57,22 +73,34 @@ ui <- dashboardPage(
                        label = "Get lyrics!",
                        icon = icon("hand-point-right"),
                        class = "btn-warning"),
-          #submitButton("Get lyrics!", icon("hand-point-right")),
-          "This process might take a minute or so, especially if there are many inputted albums.
-          See the BTS tab on the left for progress."
-        ))
-      ),
+          # submitButton("Get lyrics!", icon("hand-point-right")),
+          "See the BTS tab for progress."
+          )
+      )),
       tabItem(
         tabName = "tab_bts",
         fluidRow(
+          column(width = 4,
           box(
-            h2("List of albums"),
-            tableOutput("artist_album"),
-            tableOutput("lyrics")
+            h3("Artist and albums"),
+            tableOutput("artist_album")),
+          box(
+            h3("List of dropwords:"),
+            textOutput("dropwords")
+          )),
+          column(width = 4,
+          box(
+            h3("Dataframe of lyrics"),
+            dataTableOutput("lyrics")),
+          box(
+            h3("Top tokens"),
+            "These are the highest count non-stopwords in the data. Should some be included in the list of dropwords?",
+            tableOutput("top_tokens")
+            #dataTableOutput("tokenized")
             # tableOutput("albums"),
             # textOutput("list_albums"),
             # tableOutput("lyrics")
-          )
+          ))
         )
       )
     )
@@ -81,60 +109,56 @@ ui <- dashboardPage(
 
 server <- function(input, output){
   
+  observeEvent(input$action_grab, {
+    
   df_artist_album <- reactive({
-    input$action_grab
-    isolate(
-    data.frame(
-      artist = c(unlist(str_split(input$input_artist, ", "))),
-      album = c(unlist(str_split(input$input_albums, ", ")))
-    )
-  )
-  })
+    data.frame(artist = c(unlist(str_split(input$input_artist, ", "))),
+               album = c(unlist(str_split(input$input_albums, ", "))))
+    })
   
   output$artist_album <- renderTable({df_artist_album()})
   
   df_lyrics <- reactive({
-    withProgress(message = "Gathering data",
-    df_artist_album() %>% 
-      add_genius(artist, album, type = "album")
-    )
+      withProgress(message = "Gathering data!",
+                   df_artist_album() %>% 
+                     add_genius(artist, album, type = "album"))
+    })
+  
+  df_tokenized <- reactive({
+    withProgress(message = "Tokenizing data",
+                 df_lyrics() %>% 
+                   unnest_tokens(output = word, input = lyric, token = "words"))
   })
   
-  output$lyrics <- renderTable({df_lyrics()})
+  output$lyrics <- renderDataTable({
+    datatable(style = "bootstrap",
+              df_lyrics())
+  })
   
-  # df_albums <- reactive({
-  #   as.data.frame(c(unlist(str_split(input$input_albums, ", ")))) %>% 
-  #     rename("album_title" = 1) %>% 
-  #     rowid_to_column() %>%
-  #     mutate(album = as.character(rowid))
+  # output$tokenized <- renderDataTable({
+  #   datatable(style = "bootstrap",
+  #             df_tokenized())
   # })
-  # output$albums <- renderTable({df_albums()})
-  # 
-  # list_albums <- reactive({c(unlist(str_split(input$input_albums, ", ")))})
-  # 
-  # df_lyrics <- reactive({
-  #   list_albums() %>%
-  #     map_dfr(.f = genius_album, artist = input$input_artist, .id = "album") %>%
-  #     left_join(list_albums) %>%
-  #     select(!album) %>%
-  #     rename(album = albums_input) %>%
-  #     mutate(album = fct_relevel(as.factor(album), list_albums()))
-  # })
-  # 
-  # output$lyrics <- renderTable({df_lyrics()})
   
-  tokenized_df <- df_lyrics() %>% 
-    unnest_tokens(output = word, input = lyric, token = "words")
-  # 
-  # output$wordclouds <- tokenized_df() %>% 
-  #   anti_join(stop_words, by = "word") %>%
-  #   count(word, sort = TRUE) %>%
-  #   filter(!word %in% {{drop_words}}) %>%
-  #   with(wordcloud(word,
-  #                  n,
-  #                  min.freq = {{min_freq}},
-  #                  random.order = {{random_order}},
-  #                  colors = {{color_pal}}))
+  output$top_tokens <- renderTable({
+    df_tokenized() %>% 
+      anti_join(stop_words, by = "word") %>%
+      count(artist, album, word) %>% 
+      slice_max(order_by = n, n = 10)
+  })
+  
+  })
+  
+  
+  observeEvent(input$action_dropwords, {
+    output$dropwords <- renderText(c(unlist(str_split(input$input_dropwords, ", "))))
+    
+    # df_tokenized <- reactive({df_tokenized() %>% 
+    #   filter(!word %in% c(unlist(str_split(input$input_dropwords, ", "))))
+    #   })
+    })
+  
+  
   
   
 }
