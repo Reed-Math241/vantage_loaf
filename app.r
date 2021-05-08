@@ -75,32 +75,32 @@ ui <- dashboardPage(
                        class = "btn-warning"),
           # submitButton("Get lyrics!", icon("hand-point-right")),
           "See the BTS tab for progress."
-          )
-      )),
+          ))
+      ),
       tabItem(
         tabName = "tab_bts",
         fluidRow(
           column(width = 4,
-          box(
+          box(width = NULL, solidHeader = TRUE, background = "black", status = "warning",
             h3("Artist and albums"),
             tableOutput("artist_album")),
-          box(
+          box(width = NULL, solidHeader = TRUE, background = "black", status = "warning",
             h3("List of dropwords:"),
-            textOutput("dropwords")
-          )),
+            textOutput("dropwords"))
+          ),
           column(width = 4,
-          box(
+          box(width = NULL, solidHeader = TRUE, background = "black", status = "warning",
             h3("Dataframe of lyrics"),
             dataTableOutput("lyrics")),
-          box(
+          box(width = NULL, solidHeader = TRUE, background = "black", status = "warning",
             h3("Top tokens"),
             "These are the highest count non-stopwords in the data. Should some be included in the list of dropwords?",
-            tableOutput("top_tokens")
+            tableOutput("top_tokens"))
             #dataTableOutput("tokenized")
             # tableOutput("albums"),
             # textOutput("list_albums"),
             # tableOutput("lyrics")
-          ))
+          )
         )
       )
     )
@@ -152,7 +152,6 @@ server <- function(input, output){
   
   observeEvent(input$action_dropwords, {
     output$dropwords <- renderText(c(unlist(str_split(input$input_dropwords, ", "))))
-    
     # df_tokenized <- reactive({df_tokenized() %>% 
     #   filter(!word %in% c(unlist(str_split(input$input_dropwords, ", "))))
     #   })
