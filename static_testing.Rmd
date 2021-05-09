@@ -53,15 +53,15 @@ artist_album <- data.frame(
 )
 
 genius_testy <- artist_album %>% 
-  add_genius(artist, album, type = "album")
-
-
-genius_testy %>% 
+  add_genius(artist, album, type = "album") %>% 
   mutate(
     album = fct_inorder(as.factor(album)),
     artist = fct_inorder(as.factor(artist)),
     track_title = fct_reorder(as.factor(track_title), track_n)
-    ) %>% 
+    )
+
+
+genius_testy %>%
   unnest_tokens(output = word, input = lyric, token = "words") %>% 
     inner_join(get_sentiments("nrc")) %>%
     count(album, artist, sentiment) %>% 
@@ -162,6 +162,32 @@ album_afinn <- function(lyrics_df,
 
 album_afinn(my_lyrics)
 ```
+
+```{r afinn_artists}
+genius_testy %>% 
+  unnest_tokens(output = word, input = lyric, token = "words") %>% 
+  group_by(album, artist, track_title) %>%
+    mutate(index = round(line / max(line) * 100)) %>%
+    inner_join(get_sentiments("afinn")) %>%
+    ungroup() %>%
+    count(album, index = index, wt = value) %>%
+    ggplot(aes(x = index, y = n, fill = n)) +
+    facet_grid(rows = vars(album), scales = "free_y") +
+    geom_col() +
+    theme_few() +
+    labs(
+      x = "Relative line position (% through song)",
+      y = "Sentiment value",
+      fill = "Sentiment value: ",
+      title = paste("AFINN sentiment analysis"),
+      subtitle = "Net sentiment value by relative line position across all songs in an album.",
+      caption = "Sentiment data provided by Finn Arup Nielsen"
+      ) +
+    geom_hline(yintercept = 0, color = "black") +
+    theme(legend.position = "bottom") +
+    scale_fill_viridis(option = "plasma")
+```
+
 
 ```{r nrc_album}
 nrc_order <- c("positive", "negative",

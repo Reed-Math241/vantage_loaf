@@ -129,6 +129,19 @@ ui <- dashboardPage(
         )
       ),
       tabItem(
+        tabName = "tab_cloud",
+        fluidRow(
+          column(
+            width = 4,
+            box(
+              width = NULL, solidHeader = TRUE, background = "black", status = "warning",
+              title = "Wordclouds",
+              "Text goes here."
+            )
+          )
+        )
+      ),
+      tabItem(
         tabName = "tab_nrc",
         fluidRow(
           column(
@@ -157,6 +170,33 @@ ui <- dashboardPage(
           column(
             width = 6,
             plotOutput("output_nrc", height = "800px")
+          )
+        )
+      ),
+      tabItem(
+        tabName = "tab_afinn",
+        fluidRow(
+          column(
+            width = 4,
+            box(
+              width = NULL, solidHeader = TRUE, background = "black", status = "warning",
+              title = "AFINN analysis",
+              "The",
+              tags$a(href="https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1467-8640.2012.00460.x", "AFINN sentiment lexicon"),
+              HTML("analyzes words using a scale of -5 (most negative sentiment) to +5 (most positive sentiment).<br>
+                   The button below will plot the AFINN results averaged by album based on words' relative position in each song. 
+                   This way, one can compare if various albums are generally negative or positive, and generally where songs are most positive or negative.<br><br>"),
+              actionButton(
+                inputId = "action_afinn",
+                label = "Generate AFINN!",
+                icon = icon("hand-point-right"),
+                class = "btn-warning"
+              )
+            )
+          ),
+          column(
+            width = 6,
+            plotOutput("output_afinn", height = "800px")
           )
         )
       ),
@@ -368,6 +408,32 @@ server <- function(input, output){
                 clean_names(case = "title")
     )
   })
+  
+  plot_afinn <- eventReactive(input$action_afinn, {
+    df_tokenized() %>% 
+      group_by(album, artist, track_title) %>%
+      mutate(index = round(line / max(line) * 100)) %>%
+      inner_join(get_sentiments("afinn")) %>%
+      ungroup() %>%
+      count(album, index = index, wt = value) %>%
+      ggplot(aes(x = index, y = n, fill = n)) +
+      facet_grid(rows = vars(album), scales = "free_y") +
+      geom_col() +
+      theme_few() +
+      labs(
+        x = "Relative line position (% through song)",
+        y = "Sentiment value",
+        fill = "Sentiment value: ",
+        title = paste("AFINN sentiment analysis"),
+        subtitle = "Net sentiment value by relative line position across all songs in an album.",
+        caption = "Sentiment data provided by Finn Arup Nielsen"
+      ) +
+      geom_hline(yintercept = 0, color = "black") +
+      theme(legend.position = "bottom") +
+      scale_fill_viridis(option = "plasma")
+  })
+  
+  output$output_afinn <- renderPlot({plot_afinn()})
   
 }
 
