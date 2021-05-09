@@ -147,3 +147,15 @@ data.frame(
 )
 ```
 
+```{r filtering_tests}
+my_tokens <- my_lyrics %>% 
+  unnest_tokens(output = word, input = lyric, token = "words")
+
+my_tokens %>% 
+  anti_join(stop_words, by = "word") %>%
+  count(track_title, album, word) %>% 
+  group_by(album) %>% 
+  slice_max(order_by = n, n = 10)
+```
+
+
