@@ -59,6 +59,11 @@ sentences <- my_lyrics %>%
 sentences %>% 
   ggplot(aes(x = ave_sentiment, y = track_title, color = album)) +
   geom_point()
+
+my_lyrics %>%
+  get_sentences() %$% 
+  profanity_by(lyric, list(track_title, album)) %>% 
+  arrange(desc(profanity_count))
 ```
 
 ```{r text_highlighting}
@@ -120,19 +125,33 @@ album_nrc <- function(lyrics_df){
     ggplot(aes(x = n,
                y = sentiment,
                fill = album)) +
-    facet_grid(vars(cat), scales = "free_y") +
+    facet_grid(vars(cat), scales = "free_y", space = "free_y") +
     geom_col(position = "dodge") +
-    theme_few() +
+    #theme_few() +
+    theme_hc(style = "darkunica") +
     theme(legend.position = "bottom") +
     labs(
       title = paste("Sentiment analysis of select", {{artist_of_interest}}, "albums"),
       x = "Word count",
       y = "",
-      color = "Album"
-    )
+      fill = "Album"
+    ) +
+    scale_fill_brewer(palette = "Set3")
 }
 
 album_nrc(my_lyrics)
+
+my_lyrics %>% 
+  unnest_tokens(output = word, input = lyric, token = "words") %>% 
+    inner_join(get_sentiments("nrc")) %>%
+    count(album, sentiment, word) %>% 
+    mutate(sentiment = fct_relevel(as.factor(sentiment), nrc_order)) %>% 
+  mutate(cat = case_when(
+    (sentiment == "positive" | sentiment == "negative") ~ "Sentiment",
+    TRUE ~ "Emotion")
+  ) %>% 
+  group_by(album, sentiment) %>% 
+  slice_max(order_by = n, n = 1)
 ```
 
 ```{r text_input_test}

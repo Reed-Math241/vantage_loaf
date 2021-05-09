@@ -4,6 +4,7 @@ library(shinydashboard)
 library(tidyverse)
 library(genius)
 library(tidytext)
+library(textdata)
 library(sentimentr)
 library(magrittr)
 library(ggthemes)
@@ -37,8 +38,9 @@ ui <- dashboardPage(
               h4("This dashboard will grab information from",
               tags$a(href="https://genius.com/", "Genius"),
               "based on provided inputs, and conduct sentiment analysis."),
-              "You can grab information for multiple albums from a single artist, or multiple albums from different artists.",
+              "You can grab information for an album or albums from a single artist, or multiple albums from different artists.",
               HTML("You can also filter out \"dropwords\" (words that might overwhelm word-by-word analysis that otherwise aren't stopwords).<br>"),
+              tags$hr(),
               "Due to the nature of the function used to grab the lyric data, some songs might not have their lyric data properly loaded,
               since Genius is not always consistent with URLs."
             ),
@@ -84,7 +86,7 @@ ui <- dashboardPage(
             box(
               width = NULL, solidHeader = TRUE, background = "black", status = "warning",
               HTML("Press the button below once artists and albums have been entered!
-                   The data gathering process will take a few moments. See the BTS tab for progress.<br><br>"),
+                   The data gathering process will take a few moments. Check the BTS tab for progress.<br><br>"),
               actionButton(
                 inputId = "action_grab",
                 label = "Get lyrics!",
@@ -125,6 +127,74 @@ ui <- dashboardPage(
               width = NULL, solidHeader = TRUE, status = "warning",
               title = "Dataframe of lyrics",
               dataTableOutput("output_lyrics")
+            )
+          )
+        )
+      ),
+      tabItem(
+        tabName = "tab_nrc",
+        fluidRow(
+          column(
+            width = 5,
+            box(
+              width = NULL, solidHeader = TRUE, background = "black", status = "warning",
+              title = "Sentiment anlaysis via NRC",
+              "This analysis utilizes the",
+              tags$a(href="https://saifmohammad.com/WebPages/NRC-Emotion-Lexicon.htm", "NRC Lexicon"),
+              "to analyze the emotional and sentimental associations with the provided tokens.",
+              HTML("<br>Along with positive and negative sentiments, it analyzes for 
+                   anger, fear, anticipation, trust, surprise, sadness, joy, and disgust.<br><br>"),
+              actionButton(
+                inputId = "action_nrc",
+                label = "Conduct NRC!",
+                icon = icon("hand-point-right"),
+                class = "btn-warning"
+              )
+            ),
+            box(
+              width = NULL, solidHeader = TRUE, status = "warning",
+              title = "Highest frequency words of each sentiment",
+              dataTableOutput("output_nrc_top")
+            )
+          ),
+          column(
+            width = 6,
+            plotOutput("output_nrc", height = "800px")
+          )
+        )
+      ),
+      tabItem(
+        tabName = "tab_lyric",
+        fluidRow(
+          column(
+            width = 10,
+            box(
+              width = NULL, solidHeader = TRUE, background = "black", status = "warning",
+              title = "Sentence analysis",
+              "Conduct line-by-line sentiment analysis via the",
+              tags$a(href="https://github.com/trinker/sentimentr", tags$code("sentimentr")),
+              "package. Lines of positive sentiment are highlighted green, while negative are highlighted pink.",
+              HTML("Average sentiment value by song are also included as numeric values.<br><br>"),
+              actionButton(
+                inputId = "action_line",
+                label = "Generate sentence analysis!",
+                icon = icon("hand-point-right"),
+                class = "btn-warning"
+              ),
+              HTML("<br><br>Results will open in a new tab."),
+              htmlOutput("output_lines")
+            ),
+            box(
+              width = NULL, solidHeader = TRUE, status = "warning",
+              title = "How profane",
+              HTML("Aggregating profanity by song<br><br>"),
+              actionButton(
+                inputId = "action_profanity",
+                label = "Calculate profanity!",
+                icon = icon("hand-point-right"),
+                class = "btn-warning"
+              ),
+              dataTableOutput("output_profanity")
             )
           )
         )
@@ -174,6 +244,11 @@ server <- function(input, output){
     )
   })
   
+  eventReactive(input$action_dropwords, {
+    df_tokenized <- df_tokenized() %>%
+      filter(!word %in% list_drop())
+  })
+  
   output$output_top_tokens <- renderTable({
     df_tokenized() %>% 
       anti_join(stop_words, by = "word") %>%
@@ -183,15 +258,6 @@ server <- function(input, output){
       slice_max(order_by = n, n = 5)
   })
   
-  
-  
-  # observeEvent(input$action_dropwords, {
-  #   output$dropwords <- renderText(c(unlist(str_split(input$input_dropwords, ", "))))
-  #   # df_tokenized <- reactive({df_tokenized() %>% 
-  #   #   filter(!word %in% c(unlist(str_split(input$input_dropwords, ", "))))
-  #   #   })
-  #   })
-  
   list_drop <- eventReactive(input$action_dropwords, {
     c(unlist(str_split(input$input_dropwords, ", ")))
   })
@@ -199,7 +265,106 @@ server <- function(input, output){
   output$output_dropwords <- renderText({list_drop()})
   
   
+  line_by_line <- eventReactive(input$action_line, {
+    df_lyrics() %>% 
+      mutate(lyric_line = get_sentences(lyric)) %$%
+      sentiment_by(lyric, list(track_title, album)) %>% 
+      highlight()
+  })
   
+  output$output_lines <- renderText({line_by_line()})
+  
+  df_profanity <- eventReactive(input$action_profanity, {
+    df_lyrics() %>% 
+      get_sentences() %$% 
+      profanity_by(lyric, list(track_title, album, artist)) %>% 
+      arrange(desc(profanity_count))
+  })
+  
+  output$output_profanity <- renderDataTable({
+    datatable(style = "bootstrap",
+              filter = list(position = "top", plain = TRUE),
+              df_profanity() %>% 
+                mutate(
+                  artist = as.factor(artist),
+                  album = as.factor(album),
+                  track_title = as.factor(track_title)
+                ) %>% 
+                clean_names(case = "title")
+    )
+  })
+  
+  nrc_order <- c("positive", "negative",
+                 "anger", "fear", "anticipation",
+                 "trust", "surprise",
+                 "sadness", "joy", "disgust")
+  
+  df_nrc <- eventReactive(input$action_nrc, {
+    df_tokenized() %>% 
+      inner_join(get_sentiments("nrc"))
+  })
+  
+  output$output_nrc <- renderPlot({
+    df_nrc() %>% 
+      count(album, artist, sentiment) %>% 
+      mutate(sentiment = fct_relevel(as.factor(sentiment), nrc_order)) %>% 
+      mutate(cat = case_when(
+        (sentiment == "positive" | sentiment == "negative") ~ "Sentiment",
+        TRUE ~ "Emotion")
+      ) %>% 
+      ggplot(aes(x = n,
+                 y = sentiment,
+                 fill = album,
+                 color = artist)) +
+      #facet_grid(vars(cat), vars(artist), scales = "free_y", space = "free_y") +
+      facet_grid(vars(cat), scales = "free_y", space = "free_y") +
+      geom_col(position = "dodge") +
+      theme_hc(style = "darkunica") +
+      theme(
+        legend.position = "bottom",
+        legend.box = "vertical",
+        axis.text = element_text(color = "gray", size = 12)
+      ) +
+      labs(
+        title = paste("NRC Sentiment Analysis"),
+        x = "Word count",
+        y = "",
+        fill = "Album:",
+        color = "Artist:"
+      ) +
+      scale_color_brewer(palette = "Dark2") +
+      scale_fill_brewer(palette = "Set3")
+    })
+  
+  df_nrc_top <- eventReactive(input$action_nrc, {
+    df_nrc() %>% 
+      count(album, artist, sentiment, word) %>% 
+      mutate(sentiment = fct_relevel(as.factor(sentiment), nrc_order)) %>% 
+      mutate(cat = case_when(
+        (sentiment == "positive" | sentiment == "negative") ~ "Sentiment",
+        TRUE ~ "Emotion")
+      ) %>% 
+      group_by(album, artist, sentiment) %>% 
+      slice_max(order_by = n, n = 1)
+  })
+  
+  output$output_nrc_top <- renderDataTable({
+    datatable(style = "bootstrap",
+              #class = 'table-bordered table-condensed',
+              filter = list(position = "top", plain = TRUE),
+              df_nrc_top() %>% 
+                mutate(
+                  artist = as.factor(artist),
+                  album = as.factor(album),
+                  cat = as.factor(cat)
+                ) %>% 
+                rename(
+                  "category" = cat,
+                  "frequency" = n
+                ) %>% 
+                clean_names(case = "title")
+    )
+  })
   
 }
 
