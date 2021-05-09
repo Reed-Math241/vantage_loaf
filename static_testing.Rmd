@@ -46,6 +46,56 @@ my_lyrics <- get_lyrics(artist_of_interest, albums_of_interest)
 glimpse(my_lyrics)
 ```
 
+```{r getting_lyrics_new}
+artist_album <- data.frame(
+  artist = c("New Order", "Beck", "Beck"),
+  album = c("Power Corruption and Lies", "Odelay", "The Information")
+)
+
+genius_testy <- artist_album %>% 
+  add_genius(artist, album, type = "album")
+
+
+genius_testy %>% 
+  mutate(
+    album = fct_inorder(as.factor(album)),
+    artist = fct_inorder(as.factor(artist)),
+    track_title = fct_reorder(as.factor(track_title), track_n)
+    ) %>% 
+  unnest_tokens(output = word, input = lyric, token = "words") %>% 
+    inner_join(get_sentiments("nrc")) %>%
+    count(album, artist, sentiment) %>% 
+      mutate(cat = case_when(
+        (sentiment == "positive" | sentiment == "negative") ~ "Sentiment",
+        TRUE ~ "Emotion")
+      ) %>% 
+  #mutate(sentiment = str_to_title(sentiment)) %>% 
+      ggplot(aes(x = n,
+                 y = fct_rev(sentiment),
+                 fill = album,
+                 color = artist)) +
+      #facet_grid(vars(cat), vars(artist), scales = "free_y", space = "free_y") +
+      facet_grid(vars(cat), scales = "free_y", space = "free_y") +
+      geom_col(position = position_dodge2(reverse=TRUE)) +
+  geom_text(aes(label=n), position = position_dodge2(0.9, reverse = TRUE), hjust = 1.25, color="black")+
+      theme_hc(style = "darkunica") +
+      theme(
+        legend.position = "bottom",
+        legend.box = "vertical",
+        axis.text = element_text(color = "gray", size = 12)
+      ) +
+      labs(
+        title = paste("NRC Sentiment Analysis"),
+        x = "Word count",
+        y = "",
+        fill = "Album:",
+        color = "Artist:"
+      ) +
+      scale_color_brewer(palette = "Dark2") +
+      scale_fill_brewer(palette = "Set3")
+```
+
+
 
 ```{r sentiment_sentences}
 # my_lyrics %>% 
@@ -73,6 +123,13 @@ my_lyrics %>%
   sentiment_by(lyric, list(track_title, album)) %>% 
   #sentiment_by(track_title, album) %>% 
   highlight()
+
+my_lyrics %>% 
+  mutate(lyric_line = get_sentences(lyric)) %$%
+  sentiment_by(lyric, list(track_title, album)) %>% 
+  highlight(
+    open = FALSE
+  )
 ```
 
 ```{r afinn}

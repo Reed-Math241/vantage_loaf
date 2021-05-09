@@ -62,9 +62,6 @@ ui <- dashboardPage(
                 label = "Submit dropwords!",
                 icon = icon("hand-point-right"),
                 class = "btn-warning")
-              # h3("Top tokens"),
-              # "These are the highest count non-stopwords in the data. Should some be included in the list of dropwords?",
-              # tableOutput("output_top_tokens")
             )
           ),
           column(
@@ -211,13 +208,28 @@ server <- function(input, output){
                album = c(unlist(str_split(input$input_albums, ", "))))
   })
   
+  # list_artist <- eventReactive(input$action_grab, {
+  #   c(unlist(str_split(input$input_artist, ", ")))
+  # })
+  # 
+  # list_album <- eventReactive(input$action_grab, {
+  #   c(unlist(str_split(input$input_album, ", ")))
+  # })
+  
   output$output_artist_album <- renderTable({df_artist_album()})
   
   df_lyrics <- eventReactive(input$action_grab, {
     withProgress(message = "Gathering data from Genius...",
                  detail = "This will be the longest step.",
                  df_artist_album() %>% 
-                   add_genius(artist, album, type = "album")
+                   add_genius(artist, album, type = "album") %>% 
+                   mutate(
+                     # album = fct_relevel(as.factor(album), list_album()),
+                     # artist = fct_relevel(as.factor(artist), list_album()),
+                     album = fct_inorder(as.factor(album)),
+                     artist = fct_inorder(as.factor(artist)),
+                     track_title = fct_reorder(as.factor(track_title), track_n)
+                     )
     )
   })
   
@@ -234,11 +246,6 @@ server <- function(input, output){
               filter = list(position = "top", plain = TRUE),
               df_lyrics() %>% 
                 select(artist, album, track_n, track_title, line, lyric) %>% 
-                mutate(
-                  artist = as.factor(artist),
-                  album = as.factor(album),
-                  track_title = as.factor(track_title)
-                ) %>% 
                 rename("No" = track_n) %>% 
                 clean_names(case = "title")
     )
@@ -285,11 +292,6 @@ server <- function(input, output){
     datatable(style = "bootstrap",
               filter = list(position = "top", plain = TRUE),
               df_profanity() %>% 
-                mutate(
-                  artist = as.factor(artist),
-                  album = as.factor(album),
-                  track_title = as.factor(track_title)
-                ) %>% 
                 clean_names(case = "title")
     )
   })
@@ -301,13 +303,13 @@ server <- function(input, output){
   
   df_nrc <- eventReactive(input$action_nrc, {
     df_tokenized() %>% 
-      inner_join(get_sentiments("nrc"))
+      inner_join(get_sentiments("nrc")) %>% 
+      mutate(sentiment = fct_relevel(as.factor(sentiment), nrc_order))
   })
   
   output$output_nrc <- renderPlot({
     df_nrc() %>% 
       count(album, artist, sentiment) %>% 
-      mutate(sentiment = fct_relevel(as.factor(sentiment), nrc_order)) %>% 
       mutate(cat = case_when(
         (sentiment == "positive" | sentiment == "negative") ~ "Sentiment",
         TRUE ~ "Emotion")
@@ -318,7 +320,8 @@ server <- function(input, output){
                  color = artist)) +
       #facet_grid(vars(cat), vars(artist), scales = "free_y", space = "free_y") +
       facet_grid(vars(cat), scales = "free_y", space = "free_y") +
-      geom_col(position = "dodge") +
+      geom_col(position = position_dodge2(reverse = TRUE)) +
+      geom_text(aes(label=n), position = position_dodge2(0.9, reverse = TRUE), hjust = 1.25, color = "black")+
       theme_hc(style = "darkunica") +
       theme(
         legend.position = "bottom",
