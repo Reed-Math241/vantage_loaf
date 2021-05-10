@@ -17,6 +17,7 @@ library(sentimentr)
 library(tidytext)
 library(ggthemes)
 library(viridis)
+library(wordcloud)
 ```
 
 ```{r inputs}
@@ -113,7 +114,10 @@ sentences %>%
 my_lyrics %>%
   get_sentences() %$% 
   profanity_by(lyric, list(track_title, album)) %>% 
-  arrange(desc(profanity_count))
+  arrange(desc(profanity_count)) %>% 
+  mutate_at(c("sd", "ave_profanity"), round, digits = 3)
+
+
 ```
 
 ```{r text_highlighting}
@@ -187,6 +191,55 @@ genius_testy %>%
     theme(legend.position = "bottom") +
     scale_fill_viridis(option = "plasma")
 ```
+
+```{r wordcloud}
+drop_words <- c("yeah")
+min_freq <- 5
+artist_input <- "Beck"
+album_input <- "Odelay"
+
+genius_testy %>% 
+  unnest_tokens(output = word, input = lyric, token = "words") %>% 
+  anti_join(stop_words, by = "word") %>%
+  group_by(artist, album) %>% 
+    count(word, sort = TRUE) %>%
+    filter(!word %in% drop_words) %>%
+  filter(
+    artist == artist_input,
+    album == album_input
+    ) %>% 
+    with(wordcloud(word,
+                   n,
+                   min.freq = min_freq,
+                   random.order = FALSE,
+                   #colors = {{color_pal}}))
+                   colors = inferno(20, direction = -1)))
+
+artist_list <- "Beck, Mini Mansions, Beck"
+
+unique(c(unlist(str_split(artist_list, ", "))))
+
+genius_testy %>% 
+  get_sentences() %$% 
+  profanity_by(lyric, list(track_title, album, artist)) %>% 
+  ggplot(aes(x = album, color = artist, y = profanity_count)) +
+  geom_point(position = position_dodge2(width = 1, preserve = "single")) +
+  theme_hc(style = "darkunica") +
+      theme(
+        legend.position = "bottom",
+        legend.box = "vertical",
+        axis.text = element_text(color = "gray", size = 12),
+        axis.title.x = element_blank()
+      ) +
+  ylim(0, NA) +
+  labs(
+    title = "Profanity count by song in each album",
+    y = "Profanity count",
+    color = "Artist:"
+  )
+
+```
+
 
 
 ```{r nrc_album}
