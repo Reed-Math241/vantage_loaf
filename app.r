@@ -42,7 +42,7 @@ ui <- dashboardPage(
               "You can grab information for an album or albums from a single artist, or multiple albums from different artists.",
               HTML("You can also filter out \"dropwords\" (words that might overwhelm word-by-word analysis that otherwise aren't stopwords).<br>"),
               tags$hr(),
-              "Disclaimer of known bug: This dashboard utilizes functions of the",
+              HTML("<b>Note:</b> This dashboard utilizes functions of the"),
               tags$a(href="https://cran.r-project.org/package=genius", tags$code("genius")),
               "package, which at times will not be successful in grabbing all an album's song lyrics due to inconsistencies in Genius' URLs
               or function bugs. Updates can be found on the package's",
@@ -147,8 +147,8 @@ ui <- dashboardPage(
               utilizing the",
               tags$a(href="https://CRAN.R-project.org/package=wordcloud", tags$code("wordcloud")),
               "package.",
-              HTML("<br><b>CW:</b> Profanities are not filtered,
-                   and will be displayed if they have high enough frequency.")
+              HTML("<br><i><b>CW:</b> Profanities are not filtered,
+                   and will be displayed if they have high enough frequency.</i>")
             ),
             box(
               width = NULL, solidHeader = TRUE, background = "black", status = "warning",
@@ -167,7 +167,7 @@ ui <- dashboardPage(
             box(
               width = NULL, solidHeader = TRUE, background = "black", status = "warning",
               title = "Top tokens",
-              "These are the top five non-stopwords based on the provided filters. Should more be included in the list of dropwords?",
+              "These are the top five non-stopwords for each album based on the provided filters. Should more be included in the list of dropwords?",
               tableOutput("output_top_tokens")
             )
           ),
@@ -229,7 +229,8 @@ ui <- dashboardPage(
               tags$a(href="https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1467-8640.2012.00460.x", "AFINN sentiment lexicon"),
               HTML("analyzes words using a scale of -5 (most negative sentiment) to +5 (most positive sentiment).<br>
                The button below will plot the AFINN results averaged by album based on words' relative position in each song. 
-               This way, one can compare if various albums are generally negative or positive, and at what timestamp songs tend to be most positive or negative.<br><br>"),
+               This way, one can compare if various albums are generally negative or positive,
+                   and at what timestamp songs tend to be most positive or negative.<br><br>"),
               actionButton(
                 inputId = "action_afinn",
                 label = "Conduct AFINN analysis!",
@@ -272,20 +273,9 @@ ui <- dashboardPage(
               )
             ),
             box(
-              width = NULL, solidHeader = TRUE, background = "black", status = "warning",
-              title = "Highlighting lines",
-              "Lines of positive sentiment will be highlighted green, while negative will be highlighted pink.
-              Average sentiment value by song are also included as numeric values.",
-              tags$br(),
-              tags$br(),
-              actionButton(
-                inputId = "action_line",
-                label = "Conduct sentence analysis!",
-                icon = icon("hand-point-right"),
-                class = "btn-warning"
-              ),
-              HTML("<br><br>Results will open in a new window. <b>Note:</b> This function currently only works on local Shiny servers."),
-              htmlOutput("output_lines")
+              width = NULL, solidHeader = TRUE, status = "warning",
+              title = "Table of profanity by song",
+              dataTableOutput("output_profanity_table")
             )
           ),
           column(
@@ -296,9 +286,19 @@ ui <- dashboardPage(
               plotOutput("output_profanity_plot")
             ),
             box(
-              width = NULL, solidHeader = TRUE, status = "warning",
-              title = "Table of profanity by song",
-              dataTableOutput("output_profanity_table")
+              width = NULL, solidHeader = TRUE, background = "black", status = "warning",
+              title = "Highlighting lines",
+              HTML("<i><b>Note:</b> This function currently works on local Shiny servers only.</i><br>
+                   Lines of positive sentiment will be highlighted green, while negative will be highlighted pink.
+                   Average sentiment value by song are also included as numeric values.<br>
+                   Results will open in a new window.<br><br>"),
+              actionButton(
+                inputId = "action_line",
+                label = "Conduct sentence analysis!",
+                icon = icon("hand-point-right"),
+                class = "btn-warning"
+              ),
+              htmlOutput("output_lines")
             )
           )
         )
@@ -321,7 +321,7 @@ server <- function(input, output, session){
   })
   
   df_lyrics <- eventReactive(input$action_grab, {
-    withProgress(message = "Gathering data from Genius...",
+    withProgress(message = "Gathering data from Genius!",
                  detail = "This will be the longest step.",
                  df_artist_album() %>% 
                    add_genius(artist, album, type = "album") %>% 
@@ -334,7 +334,8 @@ server <- function(input, output, session){
   })
   
   df_tokenized <- eventReactive(input$action_grab, {
-    withProgress(message = "Tokenizing data",
+    withProgress(message = "Tokenizing data!",
+                 detail = "Separating lyrics into individual words.",
                  df_lyrics() %>% 
                    unnest_tokens(output = word, input = lyric, token = "words")
     )
@@ -345,7 +346,7 @@ server <- function(input, output, session){
               filter = list(position = "top", plain = TRUE),
               df_lyrics() %>% 
                 select(artist, album, track_n, track_title, line, lyric) %>% 
-                rename("No" = track_n) %>% 
+                rename("track no" = track_n) %>% 
                 clean_names(case = "title")
     )
   })
@@ -375,6 +376,15 @@ server <- function(input, output, session){
       count(artist, album, word, sort = TRUE)
   })
   
+  observeEvent(input$action_grab, {
+    df_top <- df_tokenized() %>% 
+      anti_join(stop_words, by = "word") %>% 
+      drop_na(word) %>% 
+      count(artist, album, word, sort = TRUE)
+    
+    updateSliderInput(session, inputId = "input_freq", max = max(df_top$n))
+  })
+  
   df_top_tokens <- eventReactive(input$action_cloud_filter, {
     df_wordcloud() %>% 
       group_by(artist, album) %>% 
@@ -383,19 +393,18 @@ server <- function(input, output, session){
   
   output$output_top_tokens <- renderTable({
     df_top_tokens() %>% 
+      arrange(desc(n)) %>% 
       rename("frequency" = "n") %>% 
       clean_names(case = "title")
   })
   
   plot_wordcloud <- eventReactive(input$action_cloud_filter, {
-    #plot_wordcloud <- eventReactive(input$action_cloud, {
     df_wordcloud() %>% 
       with(wordcloud(word,
                      n,
                      min.freq = input$input_freq,
                      random.order = FALSE,
-                     #colors = {{color_pal}}))
-                     colors = inferno(20, direction = -1)))
+                     colors = inferno(20, direction = -1, end = .9)))
   })
   
   output$output_wordcloud <- renderPlot({plot_wordcloud()})
@@ -473,7 +482,7 @@ server <- function(input, output, session){
                 clean_names(case = "title") %>% 
                 rename(
                   "Category" = "Cat",
-                  "n" = "N"
+                  "Frequency" = "N"
                 )
     )
   })
@@ -525,12 +534,15 @@ server <- function(input, output, session){
   
   output$output_profanity_table <- renderDataTable({
     datatable(style = "bootstrap",
+              class = 'table-bordered table-condensed',
               filter = list(position = "top", plain = TRUE),
               df_profanity() %>% 
                 arrange(desc(profanity_count)) %>% 
                 mutate_at(c("sd", "ave_profanity"), round, digits = 3) %>% 
+                select(artist, album, track_n, track_title,
+                       word_count, profanity_count, sd, ave_profanity) %>% 
                 rename(
-                  "no." = "track_n",
+                  "track no" = "track_n",
                   "standard deviation" = "sd",
                   "profanity rate" = "ave_profanity"
                 ) %>% 

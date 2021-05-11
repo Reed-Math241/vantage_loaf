@@ -265,7 +265,7 @@ genius_testy %>%
 
 ```{r wordcloud}
 drop_words <- c("yeah")
-min_freq <- 5
+min_freq <- 3
 artist_input <- "Beck"
 album_input <- "Odelay"
 
@@ -284,7 +284,7 @@ genius_testy %>%
                    min.freq = min_freq,
                    random.order = FALSE,
                    #colors = {{color_pal}}))
-                   colors = inferno(20, direction = -1)))
+                   colors = inferno(20, direction = -1, end = .9)))
 
 artist_list <- "Beck, Mini Mansions, Beck"
 
@@ -333,6 +333,14 @@ genius_testy %>%
 
 ```
 
+```{r max_grab}
+df_testing <- data.frame(
+  word = c("blah", "again"),
+  n = c(20, 12)
+)
+
+max(df_testing$n)
+```
 
 
 ```{r nrc_album}
