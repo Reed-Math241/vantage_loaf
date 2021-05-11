@@ -123,7 +123,7 @@ artist_album <- data.frame(
   album = c("Power Corruption and Lies", "Odelay", "The Information")
 )
 
-genius_testy <- artist_album %>% 
+artist_album %>% 
   add_genius(artist, album, type = "album") %>% 
   mutate(
     album = fct_inorder(as.factor(album)),
@@ -189,6 +189,52 @@ my_lyrics %>%
   mutate_at(c("sd", "ave_profanity"), round, digits = 3)
 
 
+data.frame(
+  lyric = c("This is a curse word shit", NA, "This is a regular word",
+            "The man says hello", "The girl says goodbye", "The boy says nothing",
+            "This is another curse word shit", "The dog says bark", "The pig says oink",
+            NA),
+  track_title = c("Blah","Blah","Blah",
+                  "bruh","bruh","bruh",
+                  "doo","doo","doo",
+                  "empty")
+) %>% 
+  drop_na(lyric) %>% 
+  get_sentences() %$%
+  profanity_by(lyric, list(track_title)) %>% 
+  arrange(desc(profanity_count))
+
+
+genius_testy %>% 
+  filter_at(vars(line, lyric), is.na) %>% 
+  select(!c(line, lyric))
+
+c("Speak and spell") %>% 
+  gsub(pattern = "'",
+       replacement = " ")
+
+gsub(
+  pattern = "'",
+  replacement = " ",
+  x = "Hello I'm this"
+)
+
+data.frame(
+  artist = c("Pavlov's Dog", "Beck"),
+  album = c("idk an album name", "Cellphone's dead")
+) %>% 
+  mutate(
+    artist = gsub(
+      pattern = "'",
+      replacement = "",
+      x = artist
+    ),
+    album = gsub(
+      pattern = "'",
+      replacement = " ",
+      x = album
+    )
+  )
 ```
 
 ```{r text_highlighting}

@@ -83,16 +83,38 @@ ui <- dashboardPage(
             box(
               width = NULL, solidHeader = TRUE, background = "black", status = "warning",
               title = "Required inputs",
-              HTML(
-                "<b>Some notes on inputs:</b>
-                <li>Separate values using commas.
-                <li>Capitalization does not matter, but spelling does.
-                <li>Exclude special characters, punctuation, and logograms.
-                <ul><li>Replace apostrophes with space (e.g. <i>The Sky's Gone Out</i> is <i>The Sky s Gone Out</i>).
-                <li>Caveat: Some strings that contain an ampersand (&) might have their Genius information stored
-                with an \"and\" (e.g. <i>Power, Corruption & Lies</i> is <i>Power Corruption and Lies</i>), 
-                while others skip it entirely (e.g. <i>Speak & Spell</i> is <i>Speak Spell</i>).</ul>
-                <li>Additional valid examples of inputs have been included as defaults.</li>"),
+              tags$div(
+                tags$b("Some notes on inputs:"),
+                tags$ul(
+                  tags$li("Separate values using commas."),
+                  tags$li("Capitalization does not matter, but spelling does."),
+                  tags$li("Exclude special characters, punctuation, and logograms."),
+                  tags$ul(
+                    tags$li("Caveat: Some strings that contain an ampersand (&) might have their
+                            Genius information stored with an \"and\", while others skip it entirely:",
+                            tags$ul(
+                              tags$li("e.g.",
+                                      tags$a(href="https://en.wikipedia.org/wiki/Power,_Corruption_%26_Lies",
+                                             tags$i("Power, Corruption & Lies")),
+                                      "is",
+                                      tags$a(href="https://genius.com/albums/New-order/Power-corruption-and-lies",
+                                             tags$i("Power Corruption and Lies")),
+                                      "(also note the exclusion of the comma!)"
+                              ),
+                              tags$li("e.g.",
+                                      tags$a(href="https://en.wikipedia.org/wiki/Speak_%26_Spell_(album)",
+                                             tags$i("Speak & Spell")),
+                                      "is",
+                                      tags$a(href="https://genius.com/albums/Depeche-mode/Speak-spell",
+                                             tags$i("Speak Spell"))
+                              )
+                            )
+                    ),
+                    tags$li("Apostrophes will be automatically accounted for, but consider removing them to avoid errors.")
+                  ),
+                  tags$li("Valid examples have been included as default inputs.")
+                )
+              ),
               "Still unsure how artist or album should be named if it has special marks?
               Follow the pattern that the URL of the artist/album that the",
               tags$a(href="https://genius.com/", "Genius website"),
@@ -108,13 +130,24 @@ ui <- dashboardPage(
               tags$hr(),
               HTML("Press the button below once artists and albums have been entered!
                    The data gathering process will take a few moments.
-                   When complete, the table of lyrics will fill, and text analysis can be conducted in the other tabs.<br><br>"),
+                   When complete, the tables will fill, and text analysis can be conducted in the other tabs.<br><br>"),
               actionButton(
                 inputId = "action_grab",
                 label = "Get lyrics!",
                 icon = icon("hand-point-right"),
                 class = "btn-warning"
               )
+            ),
+            box(
+              width = NULL, solidHeader = TRUE, background = "black", status = "warning",
+              title = "Note: Table of songs with missing lyric data",
+              "Since the",
+              tags$a(href="https://cran.r-project.org/package=genius", tags$code("genius")),
+              "function might fail to pull each song's lyric data (see the note on the welcome tab for more info),
+              a data frame will be provided below of songs that are missing lyric data.
+              This also includes tracks with have no lyrics, such as an instrumental song.
+              If there are songs included in the list that you would like to analyze, consider re-running the \"Grab lyrics\" function.",
+              tableOutput("output_missing")
             )
           ),
           column(
@@ -122,14 +155,14 @@ ui <- dashboardPage(
             box(
               width = NULL, solidHeader = TRUE, background = "black", status = "warning",
               title = "Table of provided inputs",
-              "If this table is printed after submission but an error is being reported in the lyric dataframe,
+              "If this table is printed after submission but an error is reported in the lyric data frame,
               check to make sure the artist and albums are appropriately lined up
               and any special characters are properly addressed.",
               tableOutput("output_artist_album")
             ),
             box(
               width = NULL, solidHeader = TRUE, status = "warning",
-              title = "Dataframe of lyrics",
+              title = "Data frame of lyrics",
               dataTableOutput("output_lyrics")
             )
           )
@@ -142,13 +175,11 @@ ui <- dashboardPage(
             width = 6,
             box(
               width = NULL, solidHeader = TRUE, background = "black", status = "warning",
-              title = "Wordclouds",
-              "This analysis will generate a wordcloud of non-stopword tokens based on the selected albums,
+              title = "Word clouds",
+              "This analysis will generate a word cloud of non-stopword tokens based on the selected albums,
               utilizing the",
               tags$a(href="https://CRAN.R-project.org/package=wordcloud", tags$code("wordcloud")),
-              "package.",
-              HTML("<br><i><b>CW:</b> Profanities are not filtered,
-                   and will be displayed if they have high enough frequency.</i>")
+              "package."
             ),
             box(
               width = NULL, solidHeader = TRUE, background = "black", status = "warning",
@@ -162,7 +193,9 @@ ui <- dashboardPage(
                 inputId = "action_cloud_filter",
                 label = "Generate wordcloud!",
                 icon = icon("hand-point-right"),
-                class = "btn-warning")
+                class = "btn-warning"),
+              HTML("<br><br><i><b>CW:</b> Profanities are not automatically filtered,
+                   and will be displayed if they have high enough frequency.</i>")
             ),
             box(
               width = NULL, solidHeader = TRUE, background = "black", status = "warning",
@@ -203,7 +236,7 @@ ui <- dashboardPage(
             ),
             box(
               width = NULL, solidHeader = TRUE, status = "warning",
-              title = "Highest frequency words of each sentiment",
+              title = "Highest frequency words of each sentiment in each album",
               dataTableOutput("output_nrc_top")
             )
           ),
@@ -228,7 +261,7 @@ ui <- dashboardPage(
               "The",
               tags$a(href="https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1467-8640.2012.00460.x", "AFINN sentiment lexicon"),
               HTML("analyzes words using a scale of -5 (most negative sentiment) to +5 (most positive sentiment).<br>
-               The button below will plot the AFINN results averaged by album based on words' relative position in each song. 
+               The button below will plot the AFINN results averaged by album based on words' relative position in each song.
                This way, one can compare if various albums are generally negative or positive,
                    and at what timestamp songs tend to be most positive or negative.<br><br>"),
               actionButton(
@@ -312,7 +345,15 @@ server <- function(input, output, session){
   #Start of tab_inputs section
   df_artist_album <- eventReactive(input$action_grab, {
     data.frame(artist = c(unlist(str_split(input$input_artists, ", "))),
-               album = c(unlist(str_split(input$input_albums, ", "))))
+               album = c(unlist(str_split(input$input_albums, ", ")))
+    ) %>%
+      mutate(artist = gsub(x = artist,
+                           pattern = "'",
+                           replacement = ""),
+             album = gsub(x = album,
+                          pattern = "'",
+                          replacement = " ")
+      )
   })
   
   output$output_artist_album <- renderTable({
@@ -349,6 +390,14 @@ server <- function(input, output, session){
                 rename("track no" = track_n) %>% 
                 clean_names(case = "title")
     )
+  })
+  
+  output$output_missing <- renderTable({
+    df_lyrics() %>%
+      filter_at(vars(line, lyric), is.na) %>%
+      select(artist, album, track_n, track_title) %>%
+      rename("track no" = track_n) %>%
+      clean_names(case = "title")
   })
   # End of tab_inputs section
   
@@ -435,7 +484,6 @@ server <- function(input, output, session){
                  y = sentiment,
                  fill = album,
                  color = artist)) +
-      #facet_grid(vars(cat), vars(artist), scales = "free_y", space = "free_y") +
       facet_grid(vars(cat), scales = "free_y", space = "free_y") +
       geom_col(position = position_dodge2(reverse = TRUE)) +
       geom_text(aes(label=n), position = position_dodge2(0.9, reverse = TRUE), hjust = 1.25, color = "black")+
@@ -528,6 +576,7 @@ server <- function(input, output, session){
   
   df_profanity <- eventReactive(input$action_profanity, {
     df_lyrics() %>% 
+      drop_na(lyric) %>% 
       get_sentences() %$% 
       profanity_by(lyric, list(track_title, track_n, album, artist))
   })
