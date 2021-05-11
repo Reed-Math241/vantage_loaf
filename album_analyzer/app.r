@@ -48,6 +48,23 @@ ui <- dashboardPage(
               or function bugs. Updates can be found on the package's",
               tags$a(href="https://github.com/JosiahParry/genius/blob/master/NEWS.md", "news"),
               "documentation."
+            ),
+            box(
+              width = NULL, solidHeader = TRUE, background = "black", status = "danger",
+              title = "May 11 update",
+              "Unfortunately as of the morning of 11 May 2021, the",
+              tags$a(href="https://cran.r-project.org/package=genius", tags$code("genius")),
+              "function that grabs lyric data based on any provided input is only partially functional:
+              It will pull a track listing successfully, but reports empty lyric values for all songs.",
+              tags$br(),
+              HTML(paste0("This issue is also occurring on other warppers, including the API-based ",
+                          tags$a(href="https://cran.r-project.org/package=geniusr", tags$code("geniusr")),
+                          ".")),
+              tags$hr(),
+              "Fortunately, I had some saved lyric data of select albums, which can be loaded in the \"Inputs\" tab.",
+              tags$br(),
+              "All text, inputs, and outputs from when the dashboard was fully functional remain,
+              but red boxes such as this have been added in order to properly load this data."
             )
           ),
           column(
@@ -96,7 +113,7 @@ ui <- dashboardPage(
                               tags$li("e.g.",
                                       tags$a(href="https://en.wikipedia.org/wiki/Power,_Corruption_%26_Lies",
                                              tags$i("Power, Corruption & Lies")),
-                                      "is",
+                                      "should be inputted as",
                                       tags$a(href="https://genius.com/albums/New-order/Power-corruption-and-lies",
                                              tags$i("Power Corruption and Lies")),
                                       "(also note the exclusion of the comma!)"
@@ -104,13 +121,30 @@ ui <- dashboardPage(
                               tags$li("e.g.",
                                       tags$a(href="https://en.wikipedia.org/wiki/Speak_%26_Spell_(album)",
                                              tags$i("Speak & Spell")),
-                                      "is",
+                                      "should be inputted as",
                                       tags$a(href="https://genius.com/albums/Depeche-mode/Speak-spell",
                                              tags$i("Speak Spell"))
                               )
                             )
                     ),
-                    tags$li("Apostrophes will be automatically accounted for, but consider removing them to avoid errors.")
+                    tags$li("Apostrophes will be automatically accounted for:",
+                            tags$ul(
+                              tags$li("Artist example:",
+                                      tags$a(href="https://en.wikipedia.org/wiki/The_B-52%27s",
+                                             "The B-52's"),
+                                      "will become",
+                                      tags$a(href="https://genius.com/artists/The-b-52s",
+                                             "The B-52s")
+                              ),
+                              tags$li("Album example:",
+                                      tags$a(href="https://en.wikipedia.org/wiki/The_Sky%27s_Gone_Out",
+                                             tags$i("The Sky's Gone Out")),
+                                      "will become",
+                                      tags$a(href="https://genius.com/albums/Bauhaus/The-sky-s-gone-out",
+                                             tags$i("The Sky s Gone Out"))
+                              )
+                            )
+                    )
                   ),
                   tags$li("Valid examples have been included as default inputs.")
                 )
@@ -132,7 +166,9 @@ ui <- dashboardPage(
                    The data gathering process will take a few moments.
                    When complete, the tables will fill, and text analysis can be conducted in the other tabs.<br><br>"),
               actionButton(
-                inputId = "action_grab",
+                #inputId = "action_grab",
+                # For fix: temporarily changing ID of action button
+                inputId = "action_grab_to_fix",
                 label = "Get lyrics!",
                 icon = icon("hand-point-right"),
                 class = "btn-warning"
@@ -152,6 +188,24 @@ ui <- dashboardPage(
           ),
           column(
             width = 6,
+            box(
+              width = NULL, solidHeader = TRUE, background = "black", status = "danger",
+              title = "May 11 update",
+              HTML("The data set will have six albums from three different artists,
+                   which is considerably large when comparing sentiments.
+                   However, all are included in order to maximize visual variability.<br>
+                   Press the button below <b>twice</b> to load the pre-saved lyric data:<br><br>"),
+              actionButton(
+                inputId = "action_grab",
+                label = "Load lyrics! (press twice)",
+                icon = icon("hand-point-right"),
+                class = "btn-danger"
+              ),
+              tags$hr(),
+              "The original \"Get lyrics\" button will not work for the time being,
+              but the box and inputs will remain for reference and to see how the dashboard would normally work.
+              Please see the update on the \"Welcome\" tab for more information."
+            ),
             box(
               width = NULL, solidHeader = TRUE, background = "black", status = "warning",
               title = "Table of provided inputs",
@@ -175,27 +229,20 @@ ui <- dashboardPage(
             width = 6,
             box(
               width = NULL, solidHeader = TRUE, background = "black", status = "warning",
-              title = "Word clouds",
-              "This analysis will generate a word cloud of non-stopword tokens based on the selected albums,
-              utilizing the",
-              tags$a(href="https://CRAN.R-project.org/package=wordcloud", tags$code("wordcloud")),
-              "package."
-            ),
-            box(
-              width = NULL, solidHeader = TRUE, background = "black", status = "warning",
               title = "Filters and options",
               checkboxGroupInput("input_cloud_artist", label = "Artist(s) to include:"),
               checkboxGroupInput("input_cloud_album", label = "Album(s) to include:"),
-              sliderInput("input_freq", label = "Minimum word frequency:", min = 1, max = 50, value = 3),
+              #sliderInput("input_freq", label = "Minimum word frequency:", min = 1, max = 50, value = 3),
+              #For fix: manually setting max value to max token value of the set; usually automatic but bugging w loaded df
+              sliderInput("input_freq", label = "Minimum word frequency:", min = 1, max = 61, value = 3),
               textInput("input_cloud_dropwords", label = "Optional - Dropword(s) to exclude, separated with commas:"),
-              HTML("<br>"),
+              HTML("<i><b>CW:</b> Profanities are not automatically filtered,
+                   and will be displayed if they have high enough frequency.</i><br><br>"),
               actionButton(
                 inputId = "action_cloud_filter",
                 label = "Generate wordcloud!",
                 icon = icon("hand-point-right"),
-                class = "btn-warning"),
-              HTML("<br><br><i><b>CW:</b> Profanities are not automatically filtered,
-                   and will be displayed if they have high enough frequency.</i>")
+                class = "btn-warning")
             ),
             box(
               width = NULL, solidHeader = TRUE, background = "black", status = "warning",
@@ -208,8 +255,19 @@ ui <- dashboardPage(
             width = 6,
             box(
               width = NULL, solidHeader = TRUE, background = "black", status = "warning",
-              title = "Wordcloud result",
+              title = "Word cloud result",
               plotOutput("output_wordcloud", height = "600px")
+            ),
+            box(
+              width = NULL, solidHeader = TRUE, background = "black", status = "warning",
+              title = "More about word clouds",
+              HTML(paste0(
+                "This analysis will generate a word cloud of non-",
+                tags$a(href="https://en.wikipedia.org/wiki/Stop_word", "stopword"),
+                " tokens based on the selected albums, utilizing the ",
+                tags$a(href="https://CRAN.R-project.org/package=wordcloud", tags$code("wordcloud")),
+                " package."
+              ))
             )
           )
         )
@@ -290,14 +348,14 @@ ui <- dashboardPage(
             box(
               width = NULL, solidHeader = TRUE, background = "black", status = "warning",
               title = "Sentence analysis",
-              "This analysis will conduct analysis by sentence (rather than by individual words) using the",
+              "These analyses will conduct analysis by sentence (rather than by individual words) using the",
               tags$a(href="https://github.com/trinker/sentimentr", tags$code("sentimentr")),
               "package."
             ),
             box(
               width = NULL, solidHeader = TRUE, background = "black", status = "warning",
               title = "How profane!",
-              HTML("Aggregate profanity by song. This will not display the profane words, but numeric counts by song.<br><br>"),
+              HTML("Aggregate profanity by song. This will <b>not</b> display the profane words, but rather numeric counts by song.<br><br>"),
               actionButton(
                 inputId = "action_profanity",
                 label = "Calculate profanity!",
@@ -321,10 +379,10 @@ ui <- dashboardPage(
             box(
               width = NULL, solidHeader = TRUE, background = "black", status = "warning",
               title = "Highlighting lines",
-              HTML("<i><b>Note:</b> This function currently works on local Shiny servers only.</i><br>
-                   Lines of positive sentiment will be highlighted green, while negative will be highlighted pink.
-                   Average sentiment value by song are also included as numeric values.<br>
-                   Results will open in a new window.<br><br>"),
+              HTML("Lines of positive sentiment will be highlighted green, while negative will be highlighted pink.
+                   Average sentiment value by song are also included as numeric values.
+                   Results will open in a new window.
+                   <br><i><b>Note:</b> This function currently works on local Shiny servers only.</i><br><br>"),
               actionButton(
                 inputId = "action_line",
                 label = "Conduct sentence analysis!",
@@ -341,6 +399,34 @@ ui <- dashboardPage(
 )
 
 server <- function(input, output, session){
+  
+  #Temporary fix
+  df_lyrics <- eventReactive(input$action_grab,{
+    withProgress(message = "Loading data!",
+                 read_csv("example_lyrics.csv") %>% 
+                   mutate(
+                     album = fct_inorder(as.factor(album)),
+                     artist = fct_inorder(as.factor(artist)),
+                     track_title = fct_reorder(as.factor(track_title), track_n)
+                   )
+                 )
+  })
+  
+  observeEvent(input$action_grab, {
+    artist_list <- df_lyrics() %>% 
+      count(artist, album) %>% 
+      mutate(artist = as.character(artist)) %>% 
+      pull(artist) %>% 
+      paste(collapse = ", ")
+    updateTextInput(session, inputId = "input_artists", value = artist_list)
+    
+    album_list <- df_lyrics() %>% 
+      mutate(album = as.character(album)) %$%
+      unique(album) %>% 
+      paste(collapse = ", ")
+    updateTextInput(session, inputId = "input_albums", value = album_list)
+  })
+  #End of temporary fix
   
   #Start of tab_inputs section
   df_artist_album <- eventReactive(input$action_grab, {
@@ -361,20 +447,20 @@ server <- function(input, output, session){
       clean_names(case = "title")
   })
   
-  df_lyrics <- eventReactive(input$action_grab, {
-    withProgress(message = "Gathering data from Genius!",
-                 detail = "This will be the longest step.",
-                 df_artist_album() %>% 
-                   add_genius(artist, album, type = "album") %>% 
-                   mutate(
-                     album = fct_inorder(as.factor(album)),
-                     artist = fct_inorder(as.factor(artist)),
-                     track_title = fct_reorder(as.factor(track_title), track_n)
-                   )
-    )
-  })
+  # df_lyrics <- eventReactive(input$action_grab, {
+  #   withProgress(message = "Gathering data from Genius!",
+  #                detail = "This will be the longest step.",
+  #                df_artist_album() %>%
+  #                  add_genius(artist, album, type = "album") %>%
+  #                  mutate(
+  #                    album = fct_inorder(as.factor(album)),
+  #                    artist = fct_inorder(as.factor(artist)),
+  #                    track_title = fct_reorder(as.factor(track_title), track_n)
+  #                  )
+  #   )
+  # })
   
-  df_tokenized <- eventReactive(input$action_grab, {
+  df_tokenized <- reactive({
     withProgress(message = "Tokenizing data!",
                  detail = "Separating lyrics into individual words.",
                  df_lyrics() %>% 
@@ -425,14 +511,16 @@ server <- function(input, output, session){
       count(artist, album, word, sort = TRUE)
   })
   
-  observeEvent(input$action_grab, {
-    df_top <- df_tokenized() %>% 
-      anti_join(stop_words, by = "word") %>% 
-      drop_na(word) %>% 
-      count(artist, album, word, sort = TRUE)
-    
-    updateSliderInput(session, inputId = "input_freq", max = max(df_top$n))
-  })
+  #Temporarily removed during fix.. reporting high values
+  # observeEvent(input$action_grab, {
+  #   df_top <- df_tokenized() %>% 
+  #     anti_join(stop_words, by = "word") %>% 
+  #     drop_na(word) %>% 
+  #     count(artist, album, word, sort = TRUE)
+  #   
+  #   updateSliderInput(session, inputId = "input_freq", max = max(df_top$n))
+  # })
+  #end of temporary removal
   
   df_top_tokens <- eventReactive(input$action_cloud_filter, {
     df_wordcloud() %>% 
@@ -520,6 +608,7 @@ server <- function(input, output, session){
     datatable(style = "bootstrap",
               class = 'table-bordered table-condensed',
               filter = list(position = "top", plain = TRUE),
+              options = list(pageLength = 25),
               df_nrc_top() %>% 
                 mutate(
                   artist = as.factor(artist),
@@ -568,7 +657,7 @@ server <- function(input, output, session){
   line_by_line <- eventReactive(input$action_line, {
     df_lyrics() %>% 
       mutate(lyric_line = get_sentences(lyric)) %$%
-      sentiment_by(lyric_line, list(track_title, album)) %>% 
+      sentiment_by(lyric_line, list(artist, album, track_title)) %>% 
       highlight()
   })
   

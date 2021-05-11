@@ -1,0 +1,72 @@
+---
+title: "wrapper_testing"
+author: "Gillian McGinnis"
+date: "5/11/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(genius)
+#install.packages("geniusr")
+library(geniusr)
+```
+
+```{r}
+mini_df <- my_lyrics %>% 
+  mutate(artist = "alt-J") %>% 
+  select(!rowid) %>% 
+  full_join(genius_testy) %>% 
+  mutate(
+    album = fct_inorder(as.factor(album)),
+    artist = fct_inorder(as.factor(artist)),
+    track_title = fct_reorder(as.factor(track_title), track_n)
+    )
+
+write.csv(mini_df, file = "album_analyzer/example_lyrics.csv", row.names = FALSE)
+```
+
+```{r}
+read_csv("album_analyzer/example_lyrics.csv")
+```
+
+
+
+```{r old_wrap, eval = FALSE}
+df_input <- data.frame(
+  artist = c("New Order", "Beck", "Beck"),
+  album = c("Power Corruption and Lies", "Odelay", "The Information")
+)
+
+
+df_input %>% 
+  add_genius(artist, album, type = "album")
+
+df_tracks <- genius_album("Beck", "Odelay") %>% mutate(artist = "Beck")
+
+df_tracks %>% 
+  select(artist, track_title) %>% 
+  rename(song = track_title)
+```
+
+```{r}
+get_lyrics_search(artist_name = "Kanye West",
+                  song_title = "Good Morning")
+```
+
+```{python, eval = FALSE, echo = FALSE}
+print("Hello Python!")
+
+pip install "lyricsgenius"
+
+import lyricsgenius
+genius = lyricsgenius.Genius(token)
+
+#genius = Genius()
+```
+
+
