@@ -15,7 +15,7 @@ library(wordcloud)
 
 ui <- dashboardPage(
   skin = "yellow",
-  dashboardHeader(title = "Album analyzer"),
+  dashboardHeader(title = "Album Analyzer"),
   dashboardSidebar(
     sidebarMenu(
       menuItem("Welcome", tabName = "tab_welcome", icon = icon("music")),
