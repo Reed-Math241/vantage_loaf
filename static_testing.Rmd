@@ -41,6 +41,76 @@ get_lyrics <- function(artist_input, albums_input){
 }
 ```
 
+
+```{r get_lyrics_manual, eval=FALSE}
+listy_albums <- c("An Awesome Wave", "Odelay")
+listy_artists <- c("alt-J", "Beck")
+
+listy_df <- data.frame(artist = listy_artists, album = listy_albums)
+
+
+genius_album(artist = "alt-J", album = "An Awesome Wave")
+genius_album(artist = "Beck", album = "Odelay")
+
+system.time(genius_album(artist = "alt-J", album = "An Awesome Wave"))
+system.time(genius_album(artist = "Beck", album = "Odelay"))
+
+pmap_dfr(
+  .f = genius_album,
+  .l = listy_df
+) %>% view()
+
+
+listy_df %>% 
+  add_genius(artist, album, type = "lyric")
+
+map2_dfr(
+  listy_artists,
+  listy_albums,
+  .f = genius_album
+)
+
+tiay <- genius_album("alt-J", "This is all yours")
+
+listy_tiay <- tiay %>% 
+  distinct(track_title) %>% 
+  mutate(artist = "alt-J") %>% 
+  rename(track = track_title)
+
+listy_tiay %>% 
+  add_genius(artist, track, type = "lyrics")
+
+data.frame(
+  artist = c("alt-J", "alt-J"),
+  song = c("Every Other Freckle", "Left Hand Free")
+) %>% 
+  group_by(song) %>% 
+  pmap(genius_lyrics)
+
+listy_tiay %>% 
+  rename("song" = "track") %>% 
+  select(artist, song) %>% 
+  group_by(song) %>% 
+  pmap(
+    genius_lyrics
+  )
+
+```
+
+```{r genius_ex, eval = FALSE}
+artist_albums <- tribble(
+ ~artist, ~album,
+ "J. Cole", "KOD",
+ "Sampha", "Process"
+)
+
+
+artist_albums %>%
+ add_genius(artist, album, type = "track")
+```
+
+
+
 ```{r getting_lyrics}
 my_lyrics <- get_lyrics(artist_of_interest, albums_of_interest)
 
@@ -98,6 +168,7 @@ genius_testy %>%
 
 
 
+
 ```{r sentiment_sentences}
 # my_lyrics %>% 
 #   mutate(lyric_split = get_sentences(lyric)) %$% 
@@ -124,13 +195,13 @@ my_lyrics %>%
 my_lyrics %>% 
   #filter(track_title == "Breezeblocks") %>% 
   mutate(lyric_line = get_sentences(lyric)) %$%
-  sentiment_by(lyric, list(track_title, album)) %>% 
+  sentiment_by(lyric_line, list(track_title, album)) %>% 
   #sentiment_by(track_title, album) %>% 
   highlight()
 
 my_lyrics %>% 
   mutate(lyric_line = get_sentences(lyric)) %$%
-  sentiment_by(lyric, list(track_title, album)) %>% 
+  sentiment_by(lyric_line, list(track_title, album)) %>% 
   highlight(
     open = FALSE
   )
@@ -234,6 +305,28 @@ genius_testy %>%
   ylim(0, NA) +
   labs(
     title = "Profanity count by song in each album",
+    y = "Profanity count",
+    color = "Artist:"
+  )
+
+genius_testy %>% 
+  get_sentences() %$% 
+  profanity_by(lyric, list(track_title, track_n, album, artist)) %>% 
+  ggplot(aes(x = track_n, y = profanity_count, color = artist)) +
+  facet_wrap(~album, scales = "free_x") +
+  geom_point() +
+  geom_path() +
+  theme_hc(style = "darkunica") +
+      theme(
+        legend.position = "bottom",
+        legend.box = "vertical",
+        axis.text = element_text(color = "gray", size = 12),
+        axis.text.x = element_blank()
+      ) +
+  ylim(0, NA) +
+  labs(
+    title = "Profanity count by song in each album",
+    x = "Track",
     y = "Profanity count",
     color = "Artist:"
   )

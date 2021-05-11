@@ -15,7 +15,7 @@ library(wordcloud)
 
 ui <- dashboardPage(
   skin = "yellow",
-  dashboardHeader(title = "Vantage loaf"),
+  dashboardHeader(title = "Album analyzer"),
   dashboardSidebar(
     sidebarMenu(
       menuItem("Welcome", tabName = "tab_welcome", icon = icon("music")),
@@ -42,10 +42,12 @@ ui <- dashboardPage(
               "You can grab information for an album or albums from a single artist, or multiple albums from different artists.",
               HTML("You can also filter out \"dropwords\" (words that might overwhelm word-by-word analysis that otherwise aren't stopwords).<br>"),
               tags$hr(),
-              "Disclaimer: This dashboard utilizes functions of the",
+              "Disclaimer of known bug: This dashboard utilizes functions of the",
               tags$a(href="https://cran.r-project.org/package=genius", tags$code("genius")),
               "package, which at times will not be successful in grabbing all an album's song lyrics due to inconsistencies in Genius' URLs
-              or minor function bugs."
+              or function bugs. Updates can be found on the package's",
+              tags$a(href="https://github.com/JosiahParry/genius/blob/master/NEWS.md", "news"),
+              "documentation."
             )
           ),
           column(
@@ -65,7 +67,10 @@ ui <- dashboardPage(
               tags$a(href="https://github.com/gmcginnis", "Gillian McGinnis"),
               "(Reed College '22) in May 2021 as a final project for",
               tags$a(href="https://www.reed.edu/registrar/courses/index.html#math241", "Math 241"),
-              "- Data Science."
+              "- Data Science.",
+              tags$hr(),
+              "Behind-the-scenes:",
+              tags$a(href="https://github.com/Reed-Math241/vantage_loaf", "GitHub repository")
             )
           )
         )
@@ -74,7 +79,7 @@ ui <- dashboardPage(
         tabName = "tab_inputs",
         fluidRow(
           column(
-            width = 4,
+            width = 6,
             box(
               width = NULL, solidHeader = TRUE, background = "black", status = "warning",
               title = "Required inputs",
@@ -89,7 +94,7 @@ ui <- dashboardPage(
                 while others skip it entirely (e.g. <i>Speak & Spell</i> is <i>Speak Spell</i>).</ul>
                 <li>Additional valid examples of inputs have been included as defaults.</li>"),
               "Still unsure how artist or album should be named if it has special marks?
-              Follow the pattern that the URL of the artist/album on the",
+              Follow the pattern that the URL of the artist/album that the",
               tags$a(href="https://genius.com/", "Genius website"),
               "uses, replacing each \"-\" with a space.",
               tags$hr(),
@@ -134,7 +139,7 @@ ui <- dashboardPage(
         tabName = "tab_cloud",
         fluidRow(
           column(
-            width = 4,
+            width = 6,
             box(
               width = NULL, solidHeader = TRUE, background = "black", status = "warning",
               title = "Wordclouds",
@@ -142,7 +147,7 @@ ui <- dashboardPage(
               utilizing the",
               tags$a(href="https://CRAN.R-project.org/package=wordcloud", tags$code("wordcloud")),
               "package.",
-              HTML("<br><b>CW:</b> As of 09 May, profanities are not filtered,
+              HTML("<br><b>CW:</b> Profanities are not filtered,
                    and will be displayed if they have high enough frequency.")
             ),
             box(
@@ -180,7 +185,7 @@ ui <- dashboardPage(
         tabName = "tab_nrc",
         fluidRow(
           column(
-            width = 4,
+            width = 6,
             box(
               width = NULL, solidHeader = TRUE, background = "black", status = "warning",
               title = "Sentiment anlaysis via NRC",
@@ -216,7 +221,7 @@ ui <- dashboardPage(
         tabName = "tab_afinn",
         fluidRow(
           column(
-            width = 4,
+            width = 6,
             box(
               width = NULL, solidHeader = TRUE, background = "black", status = "warning",
               title = "AFINN analysis",
@@ -224,7 +229,7 @@ ui <- dashboardPage(
               tags$a(href="https://onlinelibrary.wiley.com/doi/abs/10.1111/j.1467-8640.2012.00460.x", "AFINN sentiment lexicon"),
               HTML("analyzes words using a scale of -5 (most negative sentiment) to +5 (most positive sentiment).<br>
                The button below will plot the AFINN results averaged by album based on words' relative position in each song. 
-               This way, one can compare if various albums are generally negative or positive, and generally where songs are most positive or negative.<br><br>"),
+               This way, one can compare if various albums are generally negative or positive, and at what timestamp songs tend to be most positive or negative.<br><br>"),
               actionButton(
                 inputId = "action_afinn",
                 label = "Conduct AFINN analysis!",
@@ -247,11 +252,11 @@ ui <- dashboardPage(
         tabName = "tab_lyric",
         fluidRow(
           column(
-            width = 4,
+            width = 6,
             box(
               width = NULL, solidHeader = TRUE, background = "black", status = "warning",
               title = "Sentence analysis",
-              "This analysis will calculate sentiment by sentence (rather than by individual words) using the",
+              "This analysis will conduct analysis by sentence (rather than by individual words) using the",
               tags$a(href="https://github.com/trinker/sentimentr", tags$code("sentimentr")),
               "package."
             ),
@@ -279,7 +284,7 @@ ui <- dashboardPage(
                 icon = icon("hand-point-right"),
                 class = "btn-warning"
               ),
-              HTML("<br><br>Results will open in a new tab. As of 09 May, this function only works on a local server."),
+              HTML("<br><br>Results will open in a new window. <b>Note:</b> This function currently only works on local Shiny servers."),
               htmlOutput("output_lines")
             )
           ),
@@ -376,10 +381,14 @@ server <- function(input, output, session){
       slice_max(order_by = n, n = 5)
   })
   
-  output$output_top_tokens <- renderTable({df_top_tokens()})
+  output$output_top_tokens <- renderTable({
+    df_top_tokens() %>% 
+      rename("frequency" = "n") %>% 
+      clean_names(case = "title")
+  })
   
   plot_wordcloud <- eventReactive(input$action_cloud_filter, {
-  #plot_wordcloud <- eventReactive(input$action_cloud, {
+    #plot_wordcloud <- eventReactive(input$action_cloud, {
     df_wordcloud() %>% 
       with(wordcloud(word,
                      n,
@@ -502,7 +511,7 @@ server <- function(input, output, session){
   line_by_line <- eventReactive(input$action_line, {
     df_lyrics() %>% 
       mutate(lyric_line = get_sentences(lyric)) %$%
-      sentiment_by(lyric, list(track_title, album)) %>% 
+      sentiment_by(lyric_line, list(track_title, album)) %>% 
       highlight()
   })
   
@@ -511,7 +520,7 @@ server <- function(input, output, session){
   df_profanity <- eventReactive(input$action_profanity, {
     df_lyrics() %>% 
       get_sentences() %$% 
-      profanity_by(lyric, list(track_title, album, artist))
+      profanity_by(lyric, list(track_title, track_n, album, artist))
   })
   
   output$output_profanity_table <- renderDataTable({
@@ -521,6 +530,7 @@ server <- function(input, output, session){
                 arrange(desc(profanity_count)) %>% 
                 mutate_at(c("sd", "ave_profanity"), round, digits = 3) %>% 
                 rename(
+                  "no." = "track_n",
                   "standard deviation" = "sd",
                   "profanity rate" = "ave_profanity"
                 ) %>% 
@@ -530,18 +540,21 @@ server <- function(input, output, session){
   
   output$output_profanity_plot <- renderPlot({
     df_profanity() %>% 
-      ggplot(aes(x = album, color = artist, y = profanity_count)) +
-      geom_point(position = position_dodge2(width = 1, preserve = "single")) +
+      ggplot(aes(x = track_n, y = profanity_count, color = artist)) +
+      facet_wrap(~album, scales = "free_x") +
+      geom_point() +
+      geom_path() +
       theme_hc(style = "darkunica") +
       theme(
         legend.position = "bottom",
         legend.box = "vertical",
         axis.text = element_text(color = "gray", size = 12),
-        axis.title.x = element_blank()
+        axis.text.x = element_blank()
       ) +
       ylim(0, NA) +
       labs(
         title = "Profanity count by song in each album",
+        x = "Track",
         y = "Profanity count",
         color = "Artist:"
       )
